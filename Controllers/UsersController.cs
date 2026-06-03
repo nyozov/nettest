@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using nettest.Data;
 using nettest.Models;
 using nettest.Dtos;
+using BCrypt.Net;
 
 namespace nettest.Controllers;
 
@@ -22,7 +23,7 @@ public class UsersController : ControllerBase
         var user = new User
         {
             Email = dto.Email,
-            PasswordHash = dto.Password, // (we'll fix hashing later)
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password),
             Role = dto.Role
         };
 
