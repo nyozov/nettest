@@ -18,6 +18,9 @@ public class UsersController(AppDbContext db) : ControllerBase
     [AllowAnonymous]
     public IActionResult CreateUser(CreateUserDto dto)
     {
+        if (_db.Users.Any(u => u.Email == dto.Email))
+            return Conflict("A user with that email already exists");
+
         var user = new User
         {
             Email = dto.Email,
@@ -28,12 +31,26 @@ public class UsersController(AppDbContext db) : ControllerBase
         _db.Users.Add(user);
         _db.SaveChanges();
 
-        return Ok(user);
+        return Ok(ToUserResponse(user));
     }
 
     [HttpGet]
+    [Authorize(Roles = "Admin")]
     public IActionResult GetUsers()
     {
-        return Ok(_db.Users.ToList());
+        var users = _db.Users
+            .Select(user => ToUserResponse(user))
+            .ToList();
+
+        return Ok(users);
+    }
+
+    private static UserResponseDto ToUserResponse(User user)
+    {
+        return new UserResponseDto(
+            user.Id,
+            user.Email,
+            user.Role,
+            user.CreatedAt);
     }
 }

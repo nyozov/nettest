@@ -1,8 +1,10 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace nettest.Dtos;
 
 public class CreateUnitDto
 {
-    public string Name { get; set; } = "";
+    [Range(1, int.MaxValue)]
     public int UnitNumber { get; set; }
 
 }

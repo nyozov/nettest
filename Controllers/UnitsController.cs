@@ -9,7 +9,7 @@ using System.Security.Claims;
 namespace nettest.Controllers;
 
 [ApiController]
-[Authorize]
+[Authorize(Roles = "Admin,Landlord")]
 [Route("api/properties/{propertyId:int}/units")]
 public class UnitsController(AppDbContext db) : ControllerBase
 {
@@ -18,11 +18,10 @@ public class UnitsController(AppDbContext db) : ControllerBase
     [HttpPost]
     public IActionResult CreateUnit(int propertyId, CreateUnitDto dto)
     {
-        var landlordId = GetCurrentUserId();
         var property = _db.Properties
-            .FirstOrDefault(p => p.Id == propertyId && p.LandlordId == landlordId);
+            .FirstOrDefault(p => p.Id == propertyId);
 
-        if (property == null)
+        if (property == null || !CanAccessProperty(property))
             return NotFound("Property not found");
 
         var unit = new Unit
@@ -34,17 +33,23 @@ public class UnitsController(AppDbContext db) : ControllerBase
         _db.Units.Add(unit);
         _db.SaveChanges();
 
-        return Ok(unit);
+        unit.Property = property;
+
+        return Ok(ToUnitResponse(unit));
     }
 
     [HttpGet]
     public IActionResult GetUnits(int propertyId)
     {
-        var landlordId = GetCurrentUserId();
+        var property = _db.Properties.FirstOrDefault(p => p.Id == propertyId);
+
+        if (property == null || !CanAccessProperty(property))
+            return NotFound("Property not found");
 
         var units = _db.Units
             .Include(u => u.Property)
-            .Where(u => u.PropertyId == propertyId && u.Property.LandlordId == landlordId)
+            .Where(u => u.PropertyId == propertyId)
+            .Select(unit => ToUnitResponse(unit))
             .ToList();
 
         return Ok(units);
@@ -53,5 +58,28 @@ public class UnitsController(AppDbContext db) : ControllerBase
     private int GetCurrentUserId()
     {
         return int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+    }
+
+    private bool CanAccessProperty(Property property)
+    {
+        return User.IsInRole("Admin") || property.LandlordId == GetCurrentUserId();
+    }
+
+    private static UnitResponseDto ToUnitResponse(Unit unit)
+    {
+        return new UnitResponseDto(
+            unit.Id,
+            unit.UnitNumber,
+            unit.PropertyId,
+            unit.Property == null
+                ? null
+                : new PropertyResponseDto(
+                    unit.Property.Id,
+                    unit.Property.Name,
+                    unit.Property.Address,
+                    unit.Property.LandlordId,
+                    null,
+                    unit.Property.CreatedAt),
+            unit.CreatedAt);
     }
 }

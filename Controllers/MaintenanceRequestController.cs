@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Mvc;
 using nettest.Data;
 using nettest.Dtos;
@@ -22,9 +23,14 @@ public class MaintenanceRequestsController(AppDbContext db) : ControllerBase
         var userId = int.Parse(
             User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
 
-        var unit = _db.Units.FirstOrDefault(u => u.Id == unitId);
+        var unit = _db.Units
+            .Include(u => u.Property)
+            .FirstOrDefault(u => u.Id == unitId);
 
         if (unit == null)
+            return NotFound("Unit not found");
+
+        if (User.IsInRole("Landlord") && !CanAccessUnit(unit))
             return NotFound("Unit not found");
 
         var request = new MaintenanceRequest
@@ -39,32 +45,96 @@ public class MaintenanceRequestsController(AppDbContext db) : ControllerBase
         _db.MaintenanceRequests.Add(request);
         _db.SaveChanges();
 
+        request.Unit = unit;
+
         return CreatedAtAction(
             nameof(GetRequest),
             new { unitId, id = request.Id },
-            request);
+            ToMaintenanceRequestResponse(request));
     }
 
     [HttpGet("{id:int}")]
     public IActionResult GetRequest(int unitId, int id)
     {
         var request = _db.MaintenanceRequests
+            .Include(r => r.Unit)
+            .ThenInclude(u => u.Property)
+            .Include(r => r.CreatedByUser)
             .FirstOrDefault(r => r.UnitId == unitId && r.Id == id);
 
         if (request == null)
             return NotFound();
 
-        return Ok(request);
+        if (!CanAccessRequest(request))
+            return NotFound();
+
+        return Ok(ToMaintenanceRequestResponse(request));
     }
 
     [HttpGet]
     public IActionResult GetRequestsForUnit(int unitId)
     {
+        var unit = _db.Units
+            .Include(u => u.Property)
+            .FirstOrDefault(u => u.Id == unitId);
+
+        if (unit == null)
+            return NotFound("Unit not found");
+
+        if (User.IsInRole("Landlord") && !CanAccessUnit(unit))
+            return NotFound("Unit not found");
+
+        var userId = GetCurrentUserId();
+
         var requests = _db.MaintenanceRequests
+            .Include(r => r.CreatedByUser)
             .Where(r => r.UnitId == unitId)
+            .Where(r => !User.IsInRole("Tenant") || r.CreatedByUserId == userId)
             .OrderByDescending(r => r.CreatedAt)
+            .Select(request => ToMaintenanceRequestResponse(request))
             .ToList();
 
         return Ok(requests);
+    }
+
+    private bool CanAccessRequest(MaintenanceRequest request)
+    {
+        if (User.IsInRole("Admin"))
+            return true;
+
+        if (User.IsInRole("Landlord"))
+            return CanAccessUnit(request.Unit);
+
+        return request.CreatedByUserId == GetCurrentUserId();
+    }
+
+    private bool CanAccessUnit(Unit unit)
+    {
+        return User.IsInRole("Admin") || unit.Property.LandlordId == GetCurrentUserId();
+    }
+
+    private int GetCurrentUserId()
+    {
+        return int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+    }
+
+    private static MaintenanceRequestResponseDto ToMaintenanceRequestResponse(MaintenanceRequest request)
+    {
+        return new MaintenanceRequestResponseDto(
+            request.Id,
+            request.Title,
+            request.Description,
+            request.Status,
+            request.UnitId,
+            request.CreatedByUserId,
+            request.CreatedByUser == null
+                ? null
+                : new UserResponseDto(
+                    request.CreatedByUser.Id,
+                    request.CreatedByUser.Email,
+                    request.CreatedByUser.Role,
+                    request.CreatedByUser.CreatedAt),
+            request.CreatedAt,
+            request.CompletedAt);
     }
 }
