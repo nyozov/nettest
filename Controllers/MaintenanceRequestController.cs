@@ -41,7 +41,7 @@ public class MaintenanceRequestsController(AppDbContext db) : ControllerBase
 
         return CreatedAtAction(
             nameof(GetRequest),
-            new { id = request.Id },
+            new { unitId, id = request.Id },
             request);
     }
 
@@ -49,7 +49,7 @@ public class MaintenanceRequestsController(AppDbContext db) : ControllerBase
     public IActionResult GetRequest(int unitId, int id)
     {
         var request = _db.MaintenanceRequests
-            .FirstOrDefault(r => r.Id == id);
+            .FirstOrDefault(r => r.UnitId == unitId && r.Id == id);
 
         if (request == null)
             return NotFound();

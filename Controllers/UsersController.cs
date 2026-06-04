@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using nettest.Data;
 using nettest.Models;
@@ -7,12 +8,14 @@ using BCrypt.Net;
 namespace nettest.Controllers;
 
 [ApiController]
+[Authorize]
 [Route("api/users")]
 public class UsersController(AppDbContext db) : ControllerBase
 {
     private readonly AppDbContext _db = db;
 
     [HttpPost]
+    [AllowAnonymous]
     public IActionResult CreateUser(CreateUserDto dto)
     {
         var user = new User

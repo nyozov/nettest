@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
 using nettest.Data;
@@ -9,6 +10,7 @@ using System.Text;
 namespace nettest.Controllers;
 
 [ApiController]
+[AllowAnonymous]
 [Route("api/auth")]
 public class AuthController(AppDbContext db, IConfiguration config) : ControllerBase
 {
