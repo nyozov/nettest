@@ -8,14 +8,9 @@ namespace nettest.Controllers;
 
 [ApiController]
 [Route("api/users")]
-public class UsersController : ControllerBase
+public class UsersController(AppDbContext db) : ControllerBase
 {
-    private readonly AppDbContext _db;
-
-    public UsersController(AppDbContext db)
-    {
-        _db = db;
-    }
+    private readonly AppDbContext _db = db;
 
     [HttpPost]
     public IActionResult CreateUser(CreateUserDto dto)
