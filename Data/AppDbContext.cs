@@ -12,4 +12,5 @@ public class AppDbContext : DbContext
 
     public DbSet<User> Users => Set<User>();
     public DbSet<Property> Properties => Set<Property>();
+    public DbSet<Unit> Units => Set<Unit>();
 }

@@ -33,7 +33,7 @@ public class PropertiesController(AppDbContext db) : ControllerBase
     }
 
     [HttpGet]
-    public IActionResult GetUsers()
+    public IActionResult GetProperties()
     {
         return Ok(_db.Properties.ToList());
     }
