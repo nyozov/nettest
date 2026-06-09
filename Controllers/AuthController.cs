@@ -30,9 +30,9 @@ public class AuthController(AppDbContext db, IConfiguration config) : Controller
 
         var claims = new[]
         {
-            new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
-            new Claim(ClaimTypes.Email, user.Email),
-            new Claim(ClaimTypes.Role, user.Role)
+            new Claim("sub", user.Id.ToString()),
+            new Claim("email", user.Email),
+            new Claim("role", user.Role)
         };
 
         var key = new SymmetricSecurityKey(
