@@ -30,6 +30,8 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
             ValidIssuer = builder.Configuration["Jwt:Issuer"],
             ValidAudience = builder.Configuration["Jwt:Audience"],
+            NameClaimType = "sub",
+            RoleClaimType = "role",
 
             IssuerSigningKey =
                 new SymmetricSecurityKey(

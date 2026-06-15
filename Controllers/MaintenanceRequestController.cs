@@ -85,11 +85,12 @@ public class MaintenanceRequestsController(AppDbContext db) : ControllerBase
             return NotFound("Unit not found");
 
         var userId = GetCurrentUserId();
+        var isTenant = User.IsInRole("Tenant");
 
         var requests = _db.MaintenanceRequests
             .Include(r => r.CreatedByUser)
             .Where(r => r.UnitId == unitId)
-            .Where(r => !User.IsInRole("Tenant") || r.CreatedByUserId == userId)
+            .Where(r => !isTenant || r.CreatedByUserId == userId)
             .OrderByDescending(r => r.CreatedAt)
             .Select(request => ToMaintenanceRequestResponse(request))
             .ToList();

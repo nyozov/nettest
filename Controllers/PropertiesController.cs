@@ -37,10 +37,11 @@ public class PropertiesController(AppDbContext db) : ControllerBase
     public IActionResult GetProperties()
     {
         var landlordId = GetCurrentUserId();
+        var isAdmin = IsAdmin();
 
         var properties = _db.Properties
             .Include(p => p.Landlord)
-            .Where(p => IsAdmin() || p.LandlordId == landlordId)
+            .Where(p => isAdmin || p.LandlordId == landlordId)
             .Select(property => ToPropertyResponse(property))
             .ToList();
 
