@@ -3,7 +3,6 @@ using Microsoft.AspNetCore.Mvc;
 using nettest.Data;
 using nettest.Models;
 using nettest.Dtos;
-using BCrypt.Net;
 
 namespace nettest.Controllers;
 

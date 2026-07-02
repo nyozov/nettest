@@ -21,7 +21,7 @@ public class MaintenanceRequestsController(AppDbContext db) : ControllerBase
         CreateMaintenanceRequestDto dto)
     {
         var userId = int.Parse(
-            User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
+            User.FindFirst("sub")!.Value);
 
         var unit = _db.Units
             .Include(u => u.Property)
@@ -116,7 +116,7 @@ public class MaintenanceRequestsController(AppDbContext db) : ControllerBase
 
     private int GetCurrentUserId()
     {
-        return int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        return int.Parse(User.FindFirstValue("sub")!);
     }
 
     private static MaintenanceRequestResponseDto ToMaintenanceRequestResponse(MaintenanceRequest request)

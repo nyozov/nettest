@@ -50,7 +50,7 @@ public class PropertiesController(AppDbContext db) : ControllerBase
 
     private int GetCurrentUserId()
     {
-        return int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        return int.Parse(User.FindFirstValue("sub")!);
     }
 
     private bool IsAdmin()

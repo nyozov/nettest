@@ -21,11 +21,13 @@ internal static class TestHelpers
     {
         var identity = new ClaimsIdentity(
             [
-                new Claim(ClaimTypes.NameIdentifier, userId.ToString()),
-                new Claim(ClaimTypes.Role, role),
-                new Claim(ClaimTypes.Email, $"user{userId}@example.com")
+                new Claim("sub", userId.ToString()),
+                new Claim("role", role),
+                new Claim("email", $"user{userId}@example.com")
             ],
-            authenticationType: "TestAuth");
+            authenticationType: "TestAuth",
+            nameType: "sub",
+            roleType: "role");
 
         controller.ControllerContext = new ControllerContext
         {

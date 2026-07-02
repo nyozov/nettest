@@ -57,7 +57,7 @@ public class UnitsController(AppDbContext db) : ControllerBase
 
     private int GetCurrentUserId()
     {
-        return int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+        return int.Parse(User.FindFirstValue("sub")!);
     }
 
     private bool CanAccessProperty(Property property)
