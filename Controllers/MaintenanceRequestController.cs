@@ -15,6 +15,44 @@ public class MaintenanceRequestsController(AppDbContext db) : ControllerBase
 {
     private readonly AppDbContext _db = db;
 
+    [HttpGet("/api/maintenance-requests")]
+    [Authorize(Roles = "Admin,Landlord")]
+    public IActionResult GetRequests()
+    {
+        var userId = GetCurrentUserId();
+        var isAdmin = User.IsInRole("Admin");
+
+        var requests = _db.MaintenanceRequests
+            .Include(request => request.Unit)
+            .ThenInclude(unit => unit.Property)
+            .Include(request => request.CreatedByUser)
+            .Where(request =>
+                isAdmin || request.Unit.Property.LandlordId == userId)
+            .OrderByDescending(request => request.CreatedAt)
+            .Select(request => new MaintenanceRequestListItemDto(
+                request.Id,
+                request.Title,
+                request.Description,
+                request.Status,
+                request.UnitId,
+                request.Unit.UnitNumber,
+                request.Unit.PropertyId,
+                request.Unit.Property.Name,
+                request.CreatedByUserId,
+                request.CreatedByUser == null
+                    ? null
+                    : new UserResponseDto(
+                        request.CreatedByUser.Id,
+                        request.CreatedByUser.Email,
+                        request.CreatedByUser.Role,
+                        request.CreatedByUser.CreatedAt),
+                request.CreatedAt,
+                request.CompletedAt))
+            .ToList();
+
+        return Ok(requests);
+    }
+
     [HttpPost]
     public IActionResult CreateRequest(
         int unitId,

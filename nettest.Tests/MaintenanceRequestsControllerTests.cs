@@ -8,6 +8,47 @@ namespace nettest.Tests;
 public class MaintenanceRequestsControllerTests
 {
     [Fact]
+    public void GetRequests_returns_only_requests_for_landlord_properties()
+    {
+        using var db = TestHelpers.CreateDbContext();
+        var ownedUnit = AddUnit(db, landlordId: 10);
+        var otherUnit = AddUnit(db, landlordId: 11);
+        AddUser(db, id: 22, role: "Tenant");
+        db.MaintenanceRequests.AddRange(
+            new MaintenanceRequest
+            {
+                Title = "Owned request",
+                Description = "Visible to the landlord",
+                UnitId = ownedUnit.Id,
+                CreatedByUserId = 22,
+                Status = MaintenanceRequestStatus.Open
+            },
+            new MaintenanceRequest
+            {
+                Title = "Other request",
+                Description = "Must not be visible",
+                UnitId = otherUnit.Id,
+                CreatedByUserId = 22,
+                Status = MaintenanceRequestStatus.Open
+            });
+        db.SaveChanges();
+
+        var controller = new MaintenanceRequestsController(db);
+        TestHelpers.SetUser(controller, userId: 10, role: "Landlord");
+
+        var result = controller.GetRequests();
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        var requests = Assert.IsAssignableFrom<
+            IEnumerable<MaintenanceRequestListItemDto>>(ok.Value).ToList();
+
+        var request = Assert.Single(requests);
+        Assert.Equal("Owned request", request.Title);
+        Assert.Equal(ownedUnit.UnitNumber, request.UnitNumber);
+        Assert.Equal($"Property {10}", request.PropertyName);
+    }
+
+    [Fact]
     public void CreateRequest_assigns_unit_and_current_user()
     {
         using var db = TestHelpers.CreateDbContext();

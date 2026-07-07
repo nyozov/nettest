@@ -33,3 +33,17 @@ public record MaintenanceRequestResponseDto(
     UserResponseDto? CreatedByUser,
     DateTime CreatedAt,
     DateTime? CompletedAt);
+
+public record MaintenanceRequestListItemDto(
+    int Id,
+    string Title,
+    string Description,
+    MaintenanceRequestStatus Status,
+    int UnitId,
+    int UnitNumber,
+    int PropertyId,
+    string PropertyName,
+    int CreatedByUserId,
+    UserResponseDto? CreatedByUser,
+    DateTime CreatedAt,
+    DateTime? CompletedAt);

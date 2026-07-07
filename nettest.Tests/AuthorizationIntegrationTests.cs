@@ -29,20 +29,33 @@ public class AuthorizationIntegrationTests
         await using var factory = new NettestWebApplicationFactory();
         using var client = factory.CreateClient();
         client.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", CreateAdminToken());
+            new AuthenticationHeaderValue("Bearer", CreateToken("Admin"));
 
         var response = await client.GetAsync(endpoint);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
-    private static string CreateAdminToken()
+    [Fact]
+    public async Task Landlord_with_raw_jwt_claims_can_access_maintenance_queue()
+    {
+        await using var factory = new NettestWebApplicationFactory();
+        using var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", CreateToken("Landlord"));
+
+        var response = await client.GetAsync("/api/maintenance-requests");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    private static string CreateToken(string role)
     {
         var claims = new[]
         {
             new Claim("sub", "1"),
-            new Claim("email", "admin@example.com"),
-            new Claim("role", "Admin")
+            new Claim("email", $"{role.ToLowerInvariant()}@example.com"),
+            new Claim("role", role)
         };
 
         var credentials = new SigningCredentials(
