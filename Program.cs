@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using nettest.Data;
 using nettest.Services;
+using nettest.Options;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
@@ -10,8 +11,12 @@ JwtSecurityTokenHandler.DefaultInboundClaimTypeMap.Clear();
 JwtSecurityTokenHandler.DefaultOutboundClaimTypeMap.Clear();
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Configuration.AddInMemoryCollection(
+    LoadDotEnv(Path.Combine(builder.Environment.ContentRootPath, ".env")));
 
 builder.Services.AddControllers();
+builder.Services.Configure<SendGridOptions>(builder.Configuration.GetSection("SendGrid"));
+builder.Services.AddScoped<IInviteEmailSender, SendGridInviteEmailSender>();
 builder.Services.AddScoped<InviteService>();
 
 
@@ -65,5 +70,43 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
+
+static Dictionary<string, string?> LoadDotEnv(string path)
+{
+    if (!File.Exists(path))
+    {
+        return [];
+    }
+
+    var values = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+    foreach (var rawLine in File.ReadLines(path))
+    {
+        var line = rawLine.Trim();
+        if (line.Length == 0 || line.StartsWith('#'))
+        {
+            continue;
+        }
+
+        var separatorIndex = line.IndexOf('=');
+        if (separatorIndex <= 0)
+        {
+            continue;
+        }
+
+        var key = line[..separatorIndex].Trim();
+        var value = line[(separatorIndex + 1)..].Trim();
+
+        if (value.Length >= 2 &&
+            ((value.StartsWith('"') && value.EndsWith('"')) ||
+             (value.StartsWith('\'') && value.EndsWith('\''))))
+        {
+            value = value[1..^1];
+        }
+
+        values[key] = value;
+    }
+
+    return values;
+}
 
 public partial class Program;

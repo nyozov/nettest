@@ -1,0 +1,10 @@
+namespace nettest.Options;
+
+public class SendGridOptions
+{
+    public string ApiKey { get; set; } = "";
+    public string FromEmail { get; set; } = "";
+    public string FromName { get; set; } = "Nettest";
+    public string InviteSubject { get; set; } = "Your invite code";
+    public string? InviteUrl { get; set; }
+}

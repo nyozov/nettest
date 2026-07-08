@@ -5,7 +5,7 @@ using nettest.Data;
 using nettest.Models;
 using System.Security.Cryptography;
 
-public class InviteService(AppDbContext db)
+public class InviteService(AppDbContext db, IInviteEmailSender inviteEmailSender)
 {
     // Excludes 0/O, 1/I/L and similar look-alikes so codes are easy to read off a printed letter
     private const string CodeChars = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
@@ -25,6 +25,8 @@ public class InviteService(AppDbContext db)
 
         db.Invites.Add(invite);
         await db.SaveChangesAsync();
+
+        await inviteEmailSender.SendInviteAsync(invite);
 
         return invite;
     }
