@@ -93,7 +93,7 @@ static Dictionary<string, string?> LoadDotEnv(string path)
             continue;
         }
 
-        var key = line[..separatorIndex].Trim();
+        var key = line[..separatorIndex].Trim().Replace("__", ":");
         var value = line[(separatorIndex + 1)..].Trim();
 
         if (value.Length >= 2 &&

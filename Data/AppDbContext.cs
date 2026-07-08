@@ -16,6 +16,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     {
         base.OnModelCreating(modelBuilder);
 
+        modelBuilder.Entity<Invite>()
+            .ToTable("Invite");
+
         // Invite -> Unit (one unit can have many invites over time)
         modelBuilder.Entity<Invite>()
             .HasOne(i => i.Unit)
