@@ -7,6 +7,10 @@ public class User
     public string PasswordHash { get; set; } = "";
     public string Role { get; set; } = "";
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    public int? UnitId { get; set; }
+    public Unit? Unit { get; set; }
+
 }
 
 

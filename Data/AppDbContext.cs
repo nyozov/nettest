@@ -9,4 +9,37 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<Property> Properties => Set<Property>();
     public DbSet<Unit> Units => Set<Unit>();
     public DbSet<MaintenanceRequest> MaintenanceRequests => Set<MaintenanceRequest>();
+
+    public DbSet<Invite> Invites => Set<Invite>();
+
+     protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        base.OnModelCreating(modelBuilder);
+
+        // Invite -> Unit (one unit can have many invites over time)
+        modelBuilder.Entity<Invite>()
+            .HasOne(i => i.Unit)
+            .WithMany(u => u.Invites)
+            .HasForeignKey(i => i.UnitId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        // Invite -> User (who redeemed it)
+        modelBuilder.Entity<Invite>()
+            .HasOne(i => i.RedeemedByUser)
+            .WithMany()
+            .HasForeignKey(i => i.RedeemedByUserId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        // User -> Unit (tenant's current unit)
+        modelBuilder.Entity<User>()
+            .HasOne(u => u.Unit)
+            .WithMany()
+            .HasForeignKey(u => u.UnitId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        // Enforce uniqueness on the invite code itself
+        modelBuilder.Entity<Invite>()
+            .HasIndex(i => i.Code)
+            .IsUnique();
+    }
 }
