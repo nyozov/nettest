@@ -15,8 +15,11 @@ builder.Configuration.AddInMemoryCollection(
     LoadDotEnv(Path.Combine(builder.Environment.ContentRootPath, ".env")));
 
 builder.Services.AddControllers();
-builder.Services.Configure<SendGridOptions>(builder.Configuration.GetSection("SendGrid"));
-builder.Services.AddScoped<IInviteEmailSender, SendGridInviteEmailSender>();
+builder.Services.Configure<ResendOptions>(builder.Configuration.GetSection("Resend"));
+builder.Services.AddHttpClient<IInviteEmailSender, ResendInviteEmailSender>(client =>
+{
+    client.BaseAddress = new Uri("https://api.resend.com/");
+});
 builder.Services.AddScoped<InviteService>();
 
 
