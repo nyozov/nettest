@@ -71,13 +71,21 @@ public class MaintenanceRequestsController(AppDbContext db) : ControllerBase
         if (User.IsInRole("Landlord") && !CanAccessUnit(unit))
             return NotFound("Unit not found");
 
+        if (User.IsInRole("Tenant"))
+        {
+            var user = _db.Users.FirstOrDefault(user => user.Id == userId);
+            if (user?.UnitId != unitId)
+                return NotFound("Unit not found");
+        }
+
         var request = new MaintenanceRequest
         {
             Title = dto.Title,
             Description = dto.Description,
             UnitId = unitId,
             CreatedByUserId = userId,
-            Status = 0
+            Status = 0,
+            Urgency = 0,
         };
 
         _db.MaintenanceRequests.Add(request);

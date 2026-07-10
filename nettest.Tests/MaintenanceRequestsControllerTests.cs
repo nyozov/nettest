@@ -53,6 +53,7 @@ public class MaintenanceRequestsControllerTests
     {
         using var db = TestHelpers.CreateDbContext();
         var unit = AddUnit(db, landlordId: 10);
+        AddUser(db, id: 22, role: "Tenant", unitId: unit.Id);
 
         var controller = new MaintenanceRequestsController(db);
         TestHelpers.SetUser(controller, userId: 22, role: "Tenant");
@@ -71,6 +72,27 @@ public class MaintenanceRequestsControllerTests
         Assert.Equal(22, response.CreatedByUserId);
         Assert.Equal(unit.Id, request.UnitId);
         Assert.Equal(22, request.CreatedByUserId);
+    }
+
+    [Fact]
+    public void CreateRequest_denies_tenant_for_unit_they_do_not_live_in()
+    {
+        using var db = TestHelpers.CreateDbContext();
+        var unit = AddUnit(db, landlordId: 10);
+        var otherUnit = AddUnit(db, landlordId: 11);
+        AddUser(db, id: 22, role: "Tenant", unitId: otherUnit.Id);
+
+        var controller = new MaintenanceRequestsController(db);
+        TestHelpers.SetUser(controller, userId: 22, role: "Tenant");
+
+        var result = controller.CreateRequest(unit.Id, new CreateMaintenanceRequestDto
+        {
+            Title = "Leak",
+            Description = "Kitchen sink leak"
+        });
+
+        Assert.IsType<NotFoundObjectResult>(result);
+        Assert.Empty(db.MaintenanceRequests);
     }
 
     [Fact]
@@ -216,7 +238,7 @@ public class MaintenanceRequestsControllerTests
         return unit;
     }
 
-    private static void AddUser(nettest.Data.AppDbContext db, int id, string role)
+    private static void AddUser(nettest.Data.AppDbContext db, int id, string role, int? unitId = null)
     {
         if (db.Users.Any(user => user.Id == id))
             return;
@@ -226,7 +248,8 @@ public class MaintenanceRequestsControllerTests
             Id = id,
             Email = $"user{id}@example.com",
             PasswordHash = "hash",
-            Role = role
+            Role = role,
+            UnitId = unitId
         });
         db.SaveChanges();
     }

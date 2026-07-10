@@ -8,6 +8,14 @@ public enum MaintenanceRequestStatus
     Cancelled
 }
 
+public enum UrgencyLevel
+{
+    Low,
+    Medium,
+    High
+    
+}
+
 public class MaintenanceRequest
 {
     public int Id { get; set; }
@@ -16,6 +24,8 @@ public class MaintenanceRequest
     public string Description { get; set; } = "";
 
     public MaintenanceRequestStatus Status { get; set; }
+
+    public UrgencyLevel Urgency { get; set; }
 
     public int UnitId { get; set; }
     public Unit Unit { get; set; } = null!;

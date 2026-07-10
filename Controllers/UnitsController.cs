@@ -35,7 +35,7 @@ public class UnitsController(AppDbContext db) : ControllerBase
 
         unit.Property = property;
 
-        return Ok(ToUnitResponse(unit));
+        return Ok(ToUnitResponse(unit, []));
     }
 
     [HttpGet]
@@ -49,10 +49,31 @@ public class UnitsController(AppDbContext db) : ControllerBase
         var units = _db.Units
             .Include(u => u.Property)
             .Where(u => u.PropertyId == propertyId)
-            .Select(unit => ToUnitResponse(unit))
             .ToList();
 
-        return Ok(units);
+        var unitIds = units.Select(unit => unit.Id).ToList();
+        var unitTenants = _db.Users
+            .Where(user =>
+                user.UnitId != null &&
+                unitIds.Contains(user.UnitId.Value))
+            .OrderBy(user => user.Email)
+            .ToList();
+        var tenantsByUnit = unitTenants
+            .GroupBy(user => user.UnitId!.Value)
+            .ToDictionary(
+                group => group.Key,
+                group => group
+                    .Select(user => new UserResponseDto(
+                        user.Id,
+                        user.Email,
+                        user.Role,
+                        user.CreatedAt))
+                    .ToList());
+
+        return Ok(units.Select(unit =>
+            ToUnitResponse(
+                unit,
+                tenantsByUnit.GetValueOrDefault(unit.Id, []))));
     }
 
     private int GetCurrentUserId()
@@ -65,7 +86,9 @@ public class UnitsController(AppDbContext db) : ControllerBase
         return User.IsInRole("Admin") || property.LandlordId == GetCurrentUserId();
     }
 
-    private static UnitResponseDto ToUnitResponse(Unit unit)
+    private static UnitResponseDto ToUnitResponse(
+        Unit unit,
+        IReadOnlyList<UserResponseDto> tenants)
     {
         return new UnitResponseDto(
             unit.Id,
@@ -80,6 +103,7 @@ public class UnitsController(AppDbContext db) : ControllerBase
                     unit.Property.LandlordId,
                     null,
                     unit.Property.CreatedAt),
+            tenants,
             unit.CreatedAt);
     }
 }

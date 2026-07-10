@@ -21,6 +21,7 @@ public record UnitResponseDto(
     int UnitNumber,
     int PropertyId,
     PropertyResponseDto? Property,
+    IReadOnlyList<UserResponseDto> Tenants,
     DateTime CreatedAt);
 
 public record MaintenanceRequestResponseDto(

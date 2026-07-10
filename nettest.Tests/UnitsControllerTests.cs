@@ -90,6 +90,49 @@ public class UnitsControllerTests
     }
 
     [Fact]
+    public void GetUnits_includes_current_users_assigned_to_each_unit()
+    {
+        using var db = TestHelpers.CreateDbContext();
+        var property = new Property { Name = "Owned", Address = "1 Unit St", LandlordId = 5 };
+        db.Properties.Add(property);
+        db.SaveChanges();
+
+        var unit = new Unit { UnitNumber = 101, PropertyId = property.Id };
+        db.Units.Add(unit);
+        db.SaveChanges();
+
+        db.Users.AddRange(
+            new User
+            {
+                Email = "tenant@example.com",
+                PasswordHash = "hash",
+                Role = "Tenant",
+                UnitId = unit.Id
+            },
+            new User
+            {
+                Email = "roommate@example.com",
+                PasswordHash = "hash",
+                Role = "tenant",
+                UnitId = unit.Id
+            });
+        db.SaveChanges();
+
+        var controller = new UnitsController(db);
+        TestHelpers.SetUser(controller, userId: 5, role: "Landlord");
+
+        var result = controller.GetUnits(property.Id);
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        var units = Assert.IsAssignableFrom<IEnumerable<UnitResponseDto>>(ok.Value).ToList();
+        var response = Assert.Single(units);
+
+        Assert.Equal(
+            ["roommate@example.com", "tenant@example.com"],
+            response.Tenants.Select(tenant => tenant.Email).ToArray());
+    }
+
+    [Fact]
     public void Units_controller_allows_only_admin_and_landlord_roles()
     {
         var authorize = typeof(UnitsController)
