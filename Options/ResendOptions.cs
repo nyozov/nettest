@@ -6,5 +6,6 @@ public class ResendOptions
     public string FromEmail { get; set; } = "";
     public string FromName { get; set; } = "NestOps";
     public string InviteSubject { get; set; } = "Your invite code";
+    public string ConfirmationSubject { get; set; } = "Confirm your NestOps account";
     public string? InviteUrl { get; set; }
 }

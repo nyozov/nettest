@@ -14,7 +14,7 @@ public class UsersController(AppDbContext db) : ControllerBase
     private readonly AppDbContext _db = db;
 
     [HttpPost]
-    [AllowAnonymous]
+    [Authorize(Roles = "Admin")]
     public IActionResult CreateUser(CreateUserDto dto)
     {
         if (_db.Users.Any(u => u.Email == dto.Email))
@@ -24,7 +24,9 @@ public class UsersController(AppDbContext db) : ControllerBase
         {
             Email = dto.Email,
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password),
-            Role = dto.Role
+            Role = dto.Role,
+            IsEmailConfirmed = true,
+            EmailConfirmedAt = DateTime.UtcNow
         };
 
         _db.Users.Add(user);

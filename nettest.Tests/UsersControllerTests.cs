@@ -29,6 +29,8 @@ public class UsersControllerTests
         Assert.Equal("Tenant", response.Role);
         Assert.DoesNotContain("password", user.PasswordHash, StringComparison.OrdinalIgnoreCase);
         Assert.True(BCrypt.Net.BCrypt.Verify("password123", user.PasswordHash));
+        Assert.True(user.IsEmailConfirmed);
+        Assert.NotNull(user.EmailConfirmedAt);
     }
 
     [Fact]
@@ -75,6 +77,18 @@ public class UsersControllerTests
 
         var authorize = typeof(UsersController)
             .GetMethod(nameof(UsersController.GetUsers))!
+            .GetCustomAttributes(typeof(AuthorizeAttribute), inherit: false)
+            .Cast<AuthorizeAttribute>()
+            .Single();
+
+        Assert.Equal("Admin", authorize.Roles);
+    }
+
+    [Fact]
+    public void CreateUser_is_admin_only()
+    {
+        var authorize = typeof(UsersController)
+            .GetMethod(nameof(UsersController.CreateUser))!
             .GetCustomAttributes(typeof(AuthorizeAttribute), inherit: false)
             .Cast<AuthorizeAttribute>()
             .Single();

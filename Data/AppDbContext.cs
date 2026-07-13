@@ -12,6 +12,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<MaintenanceRequestImage> MaintenanceRequestImages => Set<MaintenanceRequestImage>();
 
     public DbSet<Invite> Invites => Set<Invite>();
+    public DbSet<EmailConfirmationCode> EmailConfirmationCodes => Set<EmailConfirmationCode>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -46,6 +47,15 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             .WithMany(request => request.Images)
             .HasForeignKey(image => image.MaintenanceRequestId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<EmailConfirmationCode>()
+            .HasOne(code => code.User)
+            .WithMany()
+            .HasForeignKey(code => code.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<EmailConfirmationCode>()
+            .HasIndex(code => code.UserId);
 
         // Enforce uniqueness on the invite code itself
         modelBuilder.Entity<Invite>()

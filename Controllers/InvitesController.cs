@@ -129,7 +129,9 @@ public class InvitesController(
             Email = email,
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.Password),
             Role = "Tenant",
-            UnitId = invite.UnitId
+            UnitId = invite.UnitId,
+            IsEmailConfirmed = true,
+            EmailConfirmedAt = DateTime.UtcNow
         };
 
         db.Users.Add(user);

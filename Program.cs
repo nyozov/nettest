@@ -21,6 +21,10 @@ builder.Services.AddHttpClient<IInviteEmailSender, ResendInviteEmailSender>(clie
 {
     client.BaseAddress = new Uri("https://api.resend.com/");
 });
+builder.Services.AddHttpClient<IEmailConfirmationSender, ResendEmailConfirmationSender>(client =>
+{
+    client.BaseAddress = new Uri("https://api.resend.com/");
+});
 builder.Services.AddScoped<IImageUploader, CloudinaryImageUploader>();
 builder.Services.AddScoped<InviteService>();
 

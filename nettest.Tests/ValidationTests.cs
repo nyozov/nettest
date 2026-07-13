@@ -48,6 +48,24 @@ public class ValidationTests
         Assert.Contains(errors, e => e.MemberNames.Contains(nameof(LoginDto.Password)));
     }
 
+    [Fact]
+    public void RegisterDto_requires_email_and_password()
+    {
+        var errors = Validate(new RegisterDto { Email = "not-an-email", Password = "short" });
+
+        Assert.Contains(errors, e => e.MemberNames.Contains(nameof(RegisterDto.Email)));
+        Assert.Contains(errors, e => e.MemberNames.Contains(nameof(RegisterDto.Password)));
+    }
+
+    [Fact]
+    public void VerifyEmailDto_requires_six_digit_code()
+    {
+        var errors = Validate(new VerifyEmailDto { Email = "not-an-email", Code = "123" });
+
+        Assert.Contains(errors, e => e.MemberNames.Contains(nameof(VerifyEmailDto.Email)));
+        Assert.Contains(errors, e => e.MemberNames.Contains(nameof(VerifyEmailDto.Code)));
+    }
+
     private static List<ValidationResult> Validate(object dto)
     {
         var results = new List<ValidationResult>();
