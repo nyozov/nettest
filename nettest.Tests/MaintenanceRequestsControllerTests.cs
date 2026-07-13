@@ -1,7 +1,10 @@
+using System.Text;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using nettest.Controllers;
 using nettest.Dtos;
 using nettest.Models;
+using nettest.Services;
 
 namespace nettest.Tests;
 
@@ -72,6 +75,40 @@ public class MaintenanceRequestsControllerTests
         Assert.Equal(22, response.CreatedByUserId);
         Assert.Equal(unit.Id, request.UnitId);
         Assert.Equal(22, request.CreatedByUserId);
+    }
+
+    [Fact]
+    public async Task CreateRequestWithImages_uploads_and_stores_image_urls()
+    {
+        using var db = TestHelpers.CreateDbContext();
+        var unit = AddUnit(db, landlordId: 10);
+        AddUser(db, id: 22, role: "Tenant", unitId: unit.Id);
+        var uploader = new FakeImageUploader([
+            new UploadedImage(
+                "https://res.cloudinary.com/demo/image/upload/request.jpg",
+                "nestops/maintenance/request")
+        ]);
+
+        var controller = new MaintenanceRequestsController(db, uploader);
+        TestHelpers.SetUser(controller, userId: 22, role: "Tenant");
+
+        var result = await controller.CreateRequestWithImages(
+            unit.Id,
+            new CreateMaintenanceRequestWithImagesDto
+            {
+                Title = "Leak",
+                Description = "Kitchen sink leak",
+                Images = [CreateImageFile()]
+            },
+            CancellationToken.None);
+
+        var created = Assert.IsType<CreatedAtActionResult>(result);
+        var response = Assert.IsType<MaintenanceRequestResponseDto>(created.Value);
+        var image = Assert.Single(response.Images);
+
+        Assert.Equal("https://res.cloudinary.com/demo/image/upload/request.jpg", image.Url);
+        Assert.Equal("nestops/maintenance/request", image.PublicId);
+        Assert.Single(db.MaintenanceRequestImages);
     }
 
     [Fact]
@@ -252,5 +289,26 @@ public class MaintenanceRequestsControllerTests
             UnitId = unitId
         });
         db.SaveChanges();
+    }
+
+    private static IFormFile CreateImageFile()
+    {
+        var bytes = Encoding.UTF8.GetBytes("fake image");
+        return new FormFile(new MemoryStream(bytes), 0, bytes.Length, "images", "leak.jpg")
+        {
+            Headers = new HeaderDictionary(),
+            ContentType = "image/jpeg"
+        };
+    }
+
+    private sealed class FakeImageUploader(
+        IReadOnlyList<UploadedImage> uploadedImages) : IImageUploader
+    {
+        public Task<IReadOnlyList<UploadedImage>> UploadImagesAsync(
+            IReadOnlyList<IFormFile> images,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult(uploadedImages);
+        }
     }
 }

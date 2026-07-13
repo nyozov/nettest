@@ -16,10 +16,12 @@ builder.Configuration.AddInMemoryCollection(
 
 builder.Services.AddControllers();
 builder.Services.Configure<ResendOptions>(builder.Configuration.GetSection("Resend"));
+builder.Services.Configure<CloudinaryOptions>(builder.Configuration.GetSection("Cloudinary"));
 builder.Services.AddHttpClient<IInviteEmailSender, ResendInviteEmailSender>(client =>
 {
     client.BaseAddress = new Uri("https://api.resend.com/");
 });
+builder.Services.AddScoped<IImageUploader, CloudinaryImageUploader>();
 builder.Services.AddScoped<InviteService>();
 
 

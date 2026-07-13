@@ -13,7 +13,7 @@ public enum UrgencyLevel
     Low,
     Medium,
     High
-    
+
 }
 
 public class MaintenanceRequest
@@ -36,4 +36,6 @@ public class MaintenanceRequest
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     public DateTime? CompletedAt { get; set; }
+
+    public List<MaintenanceRequestImage> Images { get; set; } = [];
 }

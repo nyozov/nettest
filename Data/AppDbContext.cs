@@ -9,10 +9,11 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<Property> Properties => Set<Property>();
     public DbSet<Unit> Units => Set<Unit>();
     public DbSet<MaintenanceRequest> MaintenanceRequests => Set<MaintenanceRequest>();
+    public DbSet<MaintenanceRequestImage> MaintenanceRequestImages => Set<MaintenanceRequestImage>();
 
     public DbSet<Invite> Invites => Set<Invite>();
 
-     protected override void OnModelCreating(ModelBuilder modelBuilder)
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
 
@@ -39,6 +40,12 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             .WithMany()
             .HasForeignKey(u => u.UnitId)
             .OnDelete(DeleteBehavior.SetNull);
+
+        modelBuilder.Entity<MaintenanceRequestImage>()
+            .HasOne(image => image.MaintenanceRequest)
+            .WithMany(request => request.Images)
+            .HasForeignKey(image => image.MaintenanceRequestId)
+            .OnDelete(DeleteBehavior.Cascade);
 
         // Enforce uniqueness on the invite code itself
         modelBuilder.Entity<Invite>()

@@ -14,7 +14,7 @@ namespace nettest.Controllers;
 public class PropertiesController(AppDbContext db) : ControllerBase
 {
     private readonly AppDbContext _db = db;
-    
+
     [HttpPost]
     public IActionResult CreateProperty(CreatePropertyDto dto)
     {
@@ -48,6 +48,41 @@ public class PropertiesController(AppDbContext db) : ControllerBase
         return Ok(properties);
     }
 
+    [HttpPut("{id:int}")]
+    public IActionResult UpdateProperty(int id, UpdatePropertyDto dto)
+    {
+        var property = _db.Properties
+            .FirstOrDefault(p => p.Id == id);
+
+        if (property == null || !CanAccessProperty(property))
+            return NotFound("Property not found");
+
+        property.Name = dto.Name.Trim();
+        property.Address = dto.Address.Trim();
+        _db.SaveChanges();
+
+        return Ok(ToPropertyResponse(property));
+    }
+
+    [HttpDelete("{id:int}")]
+    public IActionResult DeleteProperty(int id)
+    {
+        var property = _db.Properties
+            .FirstOrDefault(p => p.Id == id);
+
+        if (property == null || !CanAccessProperty(property))
+            return NotFound("Property not found");
+
+        var hasUnits = _db.Units.Any(unit => unit.PropertyId == id);
+        if (hasUnits)
+            return Conflict("Remove all units before deleting this property.");
+
+        _db.Properties.Remove(property);
+        _db.SaveChanges();
+
+        return NoContent();
+    }
+
     private int GetCurrentUserId()
     {
         return int.Parse(User.FindFirstValue("sub")!);
@@ -56,6 +91,11 @@ public class PropertiesController(AppDbContext db) : ControllerBase
     private bool IsAdmin()
     {
         return User.IsInRole("Admin");
+    }
+
+    private bool CanAccessProperty(Property property)
+    {
+        return IsAdmin() || property.LandlordId == GetCurrentUserId();
     }
 
     private static PropertyResponseDto ToPropertyResponse(Property property)

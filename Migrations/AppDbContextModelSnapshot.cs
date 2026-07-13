@@ -116,6 +116,35 @@ namespace nettest.Migrations
                     b.ToTable("MaintenanceRequests");
                 });
 
+            modelBuilder.Entity("nettest.Models.MaintenanceRequestImage", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("MaintenanceRequestId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("PublicId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Url")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MaintenanceRequestId");
+
+                    b.ToTable("MaintenanceRequestImages");
+                });
+
             modelBuilder.Entity("nettest.Models.Property", b =>
                 {
                     b.Property<int>("Id")
@@ -239,6 +268,17 @@ namespace nettest.Migrations
                     b.Navigation("Unit");
                 });
 
+            modelBuilder.Entity("nettest.Models.MaintenanceRequestImage", b =>
+                {
+                    b.HasOne("nettest.Models.MaintenanceRequest", "MaintenanceRequest")
+                        .WithMany("Images")
+                        .HasForeignKey("MaintenanceRequestId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("MaintenanceRequest");
+                });
+
             modelBuilder.Entity("nettest.Models.Property", b =>
                 {
                     b.HasOne("nettest.Models.User", "Landlord")
@@ -276,6 +316,11 @@ namespace nettest.Migrations
                     b.Navigation("Invites");
 
                     b.Navigation("MaintenanceRequests");
+                });
+
+            modelBuilder.Entity("nettest.Models.MaintenanceRequest", b =>
+                {
+                    b.Navigation("Images");
                 });
 #pragma warning restore 612, 618
         }

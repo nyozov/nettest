@@ -24,6 +24,12 @@ public record UnitResponseDto(
     IReadOnlyList<UserResponseDto> Tenants,
     DateTime CreatedAt);
 
+public record MaintenanceRequestImageResponseDto(
+    int Id,
+    string Url,
+    string PublicId,
+    DateTime CreatedAt);
+
 public record MaintenanceRequestResponseDto(
     int Id,
     string Title,
@@ -33,7 +39,8 @@ public record MaintenanceRequestResponseDto(
     int CreatedByUserId,
     UserResponseDto? CreatedByUser,
     DateTime CreatedAt,
-    DateTime? CompletedAt);
+    DateTime? CompletedAt,
+    IReadOnlyList<MaintenanceRequestImageResponseDto> Images);
 
 public record MaintenanceRequestListItemDto(
     int Id,
@@ -47,4 +54,5 @@ public record MaintenanceRequestListItemDto(
     int CreatedByUserId,
     UserResponseDto? CreatedByUser,
     DateTime CreatedAt,
-    DateTime? CompletedAt);
+    DateTime? CompletedAt,
+    IReadOnlyList<MaintenanceRequestImageResponseDto> Images);

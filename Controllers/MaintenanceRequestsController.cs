@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using nettest.Data;
 using nettest.Dtos;
 using nettest.Models;
+using nettest.Services;
 using System.Security.Claims;
 
 namespace nettest.Controllers;
@@ -11,9 +12,12 @@ namespace nettest.Controllers;
 [ApiController]
 [Authorize]
 [Route("api/units/{unitId:int}/requests")]
-public class MaintenanceRequestsController(AppDbContext db) : ControllerBase
+public class MaintenanceRequestsController(
+    AppDbContext db,
+    IImageUploader? imageUploader = null) : ControllerBase
 {
     private readonly AppDbContext _db = db;
+    private readonly IImageUploader? _imageUploader = imageUploader;
 
     [HttpGet("/api/maintenance-requests")]
     [Authorize(Roles = "Admin,Landlord")]
@@ -26,9 +30,11 @@ public class MaintenanceRequestsController(AppDbContext db) : ControllerBase
             .Include(request => request.Unit)
             .ThenInclude(unit => unit.Property)
             .Include(request => request.CreatedByUser)
+            .Include(request => request.Images)
             .Where(request =>
                 isAdmin || request.Unit.Property.LandlordId == userId)
             .OrderByDescending(request => request.CreatedAt)
+            .ToList()
             .Select(request => new MaintenanceRequestListItemDto(
                 request.Id,
                 request.Title,
@@ -47,21 +53,58 @@ public class MaintenanceRequestsController(AppDbContext db) : ControllerBase
                         request.CreatedByUser.Role,
                         request.CreatedByUser.CreatedAt),
                 request.CreatedAt,
-                request.CompletedAt))
+                request.CompletedAt,
+                ToImageResponses(request.Images)))
             .ToList();
 
         return Ok(requests);
     }
 
     [HttpPost]
+    [Consumes("application/json")]
     public IActionResult CreateRequest(
         int unitId,
-        CreateMaintenanceRequestDto dto)
+        [FromBody] CreateMaintenanceRequestDto dto)
     {
-        var userId = int.Parse(
-            User.FindFirst("sub")!.Value);
+        var accessResult = ValidateCreateRequestAccess(unitId, out var unit, out var userId);
+        if (accessResult != null)
+            return accessResult;
 
-        var unit = _db.Units
+        return CreateRequestResponse(dto, [], unit!, userId);
+    }
+
+    [HttpPost]
+    [Consumes("multipart/form-data")]
+    [RequestSizeLimit(42 * 1024 * 1024)]
+    public async Task<IActionResult> CreateRequestWithImages(
+        int unitId,
+        [FromForm] CreateMaintenanceRequestWithImagesDto dto,
+        CancellationToken cancellationToken)
+    {
+        if (dto.Images.Count > 5)
+            return BadRequest("You can upload up to 5 images.");
+
+        var accessResult = ValidateCreateRequestAccess(unitId, out var unit, out var userId);
+        if (accessResult != null)
+            return accessResult;
+
+        if (dto.Images.Count > 0 && _imageUploader == null)
+            throw new InvalidOperationException("Image uploader is not configured.");
+
+        IReadOnlyList<UploadedImage> uploadedImages = dto.Images.Count == 0
+            ? []
+            : await _imageUploader!.UploadImagesAsync(dto.Images, cancellationToken);
+
+        return CreateRequestResponse(dto, uploadedImages, unit!, userId);
+    }
+
+    private IActionResult? ValidateCreateRequestAccess(
+        int unitId,
+        out Unit? unit,
+        out int userId)
+    {
+        userId = int.Parse(User.FindFirst("sub")!.Value);
+        unit = _db.Units
             .Include(u => u.Property)
             .FirstOrDefault(u => u.Id == unitId);
 
@@ -73,19 +116,36 @@ public class MaintenanceRequestsController(AppDbContext db) : ControllerBase
 
         if (User.IsInRole("Tenant"))
         {
-            var user = _db.Users.FirstOrDefault(user => user.Id == userId);
+            var currentUserId = userId;
+            var user = _db.Users.FirstOrDefault(user => user.Id == currentUserId);
             if (user?.UnitId != unitId)
                 return NotFound("Unit not found");
         }
 
+        return null;
+    }
+
+    private IActionResult CreateRequestResponse(
+        CreateMaintenanceRequestDto dto,
+        IReadOnlyList<UploadedImage> uploadedImages,
+        Unit unit,
+        int userId)
+    {
         var request = new MaintenanceRequest
         {
             Title = dto.Title,
             Description = dto.Description,
-            UnitId = unitId,
+            UnitId = unit.Id,
             CreatedByUserId = userId,
             Status = 0,
             Urgency = 0,
+            Images = uploadedImages
+                .Select(image => new MaintenanceRequestImage
+                {
+                    Url = image.Url,
+                    PublicId = image.PublicId
+                })
+                .ToList()
         };
 
         _db.MaintenanceRequests.Add(request);
@@ -95,7 +155,7 @@ public class MaintenanceRequestsController(AppDbContext db) : ControllerBase
 
         return CreatedAtAction(
             nameof(GetRequest),
-            new { unitId, id = request.Id },
+            new { unitId = unit.Id, id = request.Id },
             ToMaintenanceRequestResponse(request));
     }
 
@@ -106,6 +166,7 @@ public class MaintenanceRequestsController(AppDbContext db) : ControllerBase
             .Include(r => r.Unit)
             .ThenInclude(u => u.Property)
             .Include(r => r.CreatedByUser)
+            .Include(r => r.Images)
             .FirstOrDefault(r => r.UnitId == unitId && r.Id == id);
 
         if (request == null)
@@ -135,9 +196,11 @@ public class MaintenanceRequestsController(AppDbContext db) : ControllerBase
 
         var requests = _db.MaintenanceRequests
             .Include(r => r.CreatedByUser)
+            .Include(r => r.Images)
             .Where(r => r.UnitId == unitId)
             .Where(r => !isTenant || r.CreatedByUserId == userId)
             .OrderByDescending(r => r.CreatedAt)
+            .ToList()
             .Select(request => ToMaintenanceRequestResponse(request))
             .ToList();
 
@@ -182,6 +245,20 @@ public class MaintenanceRequestsController(AppDbContext db) : ControllerBase
                     request.CreatedByUser.Role,
                     request.CreatedByUser.CreatedAt),
             request.CreatedAt,
-            request.CompletedAt);
+            request.CompletedAt,
+            ToImageResponses(request.Images));
+    }
+
+    private static IReadOnlyList<MaintenanceRequestImageResponseDto> ToImageResponses(
+        IEnumerable<MaintenanceRequestImage> images)
+    {
+        return images
+            .OrderBy(image => image.Id)
+            .Select(image => new MaintenanceRequestImageResponseDto(
+                image.Id,
+                image.Url,
+                image.PublicId,
+                image.CreatedAt))
+            .ToList();
     }
 }
