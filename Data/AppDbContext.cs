@@ -13,6 +13,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 
     public DbSet<Invite> Invites => Set<Invite>();
     public DbSet<EmailConfirmationCode> EmailConfirmationCodes => Set<EmailConfirmationCode>();
+    public DbSet<PasswordResetCode> PasswordResetCodes => Set<PasswordResetCode>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -55,6 +56,15 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             .OnDelete(DeleteBehavior.Cascade);
 
         modelBuilder.Entity<EmailConfirmationCode>()
+            .HasIndex(code => code.UserId);
+
+        modelBuilder.Entity<PasswordResetCode>()
+            .HasOne(code => code.User)
+            .WithMany()
+            .HasForeignKey(code => code.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<PasswordResetCode>()
             .HasIndex(code => code.UserId);
 
         // Enforce uniqueness on the invite code itself

@@ -20,11 +20,13 @@ public class AuthController(
     AppDbContext db,
     IConfiguration config,
     IEmailConfirmationSender confirmationSender,
+    IPasswordResetEmailSender passwordResetEmailSender,
     IGoogleTokenVerifier googleTokenVerifier) : ControllerBase
 {
     private readonly AppDbContext _db = db;
     private readonly IConfiguration _config = config;
     private readonly IEmailConfirmationSender _confirmationSender = confirmationSender;
+    private readonly IPasswordResetEmailSender _passwordResetEmailSender = passwordResetEmailSender;
     private readonly IGoogleTokenVerifier _googleTokenVerifier = googleTokenVerifier;
 
     [HttpPost("login")]
@@ -132,6 +134,64 @@ public class AuthController(
         });
     }
 
+    [HttpPost("forgot-password")]
+    public async Task<IActionResult> ForgotPassword(
+        ForgotPasswordDto dto,
+        CancellationToken cancellationToken)
+    {
+        var email = NormalizeEmail(dto.Email);
+        var user = await _db.Users.FirstOrDefaultAsync(u => u.Email == email, cancellationToken);
+
+        if (user != null)
+        {
+            var code = await CreatePasswordResetCodeAsync(user, cancellationToken);
+            await _passwordResetEmailSender.SendPasswordResetCodeAsync(user, code, cancellationToken);
+        }
+
+        return Ok(new
+        {
+            email,
+            expiresInMinutes = 15
+        });
+    }
+
+    [HttpPost("reset-password")]
+    public async Task<IActionResult> ResetPassword(
+        ResetPasswordDto dto,
+        CancellationToken cancellationToken)
+    {
+        var email = NormalizeEmail(dto.Email);
+        var user = await _db.Users.FirstOrDefaultAsync(u => u.Email == email, cancellationToken);
+
+        if (user == null)
+            return BadRequest("Invalid or expired reset code.");
+
+        var codeHash = HashCode(user.Id, dto.Code);
+        var resetCode = await _db.PasswordResetCodes
+            .Where(code =>
+                code.UserId == user.Id &&
+                code.ConsumedAt == null &&
+                code.ExpiresAt > DateTime.UtcNow)
+            .OrderByDescending(code => code.CreatedAt)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (resetCode == null || resetCode.CodeHash != codeHash)
+            return BadRequest("Invalid or expired reset code.");
+
+        resetCode.ConsumedAt = DateTime.UtcNow;
+        user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.NewPassword);
+
+        if (!user.IsEmailConfirmed)
+        {
+            user.IsEmailConfirmed = true;
+            user.EmailConfirmedAt = DateTime.UtcNow;
+        }
+
+        await _db.SaveChangesAsync(cancellationToken);
+
+        return Ok(new { token = CreateToken(user) });
+    }
+
     [HttpPost("verify-email")]
     public async Task<IActionResult> VerifyEmail(
         VerifyEmailDto dto,
@@ -226,6 +286,26 @@ public class AuthController(
 
         var code = RandomNumberGenerator.GetInt32(0, 1_000_000).ToString("D6");
         _db.EmailConfirmationCodes.Add(new EmailConfirmationCode
+        {
+            UserId = user.Id,
+            CodeHash = HashCode(user.Id, code),
+            ExpiresAt = DateTime.UtcNow.AddMinutes(15)
+        });
+
+        await _db.SaveChangesAsync(cancellationToken);
+        return code;
+    }
+
+    private async Task<string> CreatePasswordResetCodeAsync(
+        User user,
+        CancellationToken cancellationToken)
+    {
+        var existingCodes = _db.PasswordResetCodes
+            .Where(code => code.UserId == user.Id && code.ConsumedAt == null);
+        _db.PasswordResetCodes.RemoveRange(existingCodes);
+
+        var code = RandomNumberGenerator.GetInt32(0, 1_000_000).ToString("D6");
+        _db.PasswordResetCodes.Add(new PasswordResetCode
         {
             UserId = user.Id,
             CodeHash = HashCode(user.Id, code),

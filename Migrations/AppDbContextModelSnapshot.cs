@@ -104,6 +104,37 @@ namespace nettest.Migrations
                     b.ToTable("Invite", (string)null);
                 });
 
+            modelBuilder.Entity("nettest.Models.PasswordResetCode", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("CodeHash")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("ConsumedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("PasswordResetCodes");
+                });
+
             modelBuilder.Entity("nettest.Models.MaintenanceRequest", b =>
                 {
                     b.Property<int>("Id")
@@ -325,6 +356,17 @@ namespace nettest.Migrations
                         .IsRequired();
 
                     b.Navigation("MaintenanceRequest");
+                });
+
+            modelBuilder.Entity("nettest.Models.PasswordResetCode", b =>
+                {
+                    b.HasOne("nettest.Models.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("nettest.Models.Property", b =>

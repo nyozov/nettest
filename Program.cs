@@ -25,6 +25,10 @@ builder.Services.AddHttpClient<IEmailConfirmationSender, ResendEmailConfirmation
 {
     client.BaseAddress = new Uri("https://api.resend.com/");
 });
+builder.Services.AddHttpClient<IPasswordResetEmailSender, ResendPasswordResetEmailSender>(client =>
+{
+    client.BaseAddress = new Uri("https://api.resend.com/");
+});
 builder.Services.AddScoped<IImageUploader, CloudinaryImageUploader>();
 builder.Services.AddSingleton<IGoogleTokenVerifier, GoogleTokenVerifier>();
 builder.Services.AddScoped<InviteService>();
