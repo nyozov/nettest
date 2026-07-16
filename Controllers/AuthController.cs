@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using nettest.Data;
 using nettest.Dtos;
@@ -18,11 +19,13 @@ namespace nettest.Controllers;
 public class AuthController(
     AppDbContext db,
     IConfiguration config,
-    IEmailConfirmationSender confirmationSender) : ControllerBase
+    IEmailConfirmationSender confirmationSender,
+    IGoogleTokenVerifier googleTokenVerifier) : ControllerBase
 {
     private readonly AppDbContext _db = db;
     private readonly IConfiguration _config = config;
     private readonly IEmailConfirmationSender _confirmationSender = confirmationSender;
+    private readonly IGoogleTokenVerifier _googleTokenVerifier = googleTokenVerifier;
 
     [HttpPost("login")]
     public IActionResult Login(LoginDto dto)
@@ -33,11 +36,56 @@ public class AuthController(
         if (user == null)
             return Unauthorized();
 
-        if (!BCrypt.Net.BCrypt.Verify(dto.Password, user.PasswordHash))
+        if (string.IsNullOrWhiteSpace(user.PasswordHash) ||
+            !BCrypt.Net.BCrypt.Verify(dto.Password, user.PasswordHash))
             return Unauthorized();
 
         if (!user.IsEmailConfirmed)
             return StatusCode(StatusCodes.Status403Forbidden, "Email confirmation is required.");
+
+        return Ok(new { token = CreateToken(user) });
+    }
+
+    [HttpPost("google")]
+    public async Task<IActionResult> GoogleLogin(
+        GoogleLoginDto dto,
+        CancellationToken cancellationToken)
+    {
+        var googleUser = await _googleTokenVerifier.VerifyAsync(dto.IdToken, cancellationToken);
+        if (googleUser == null ||
+            string.IsNullOrWhiteSpace(googleUser.Email) ||
+            !googleUser.EmailVerified)
+        {
+            return Unauthorized();
+        }
+
+        var email = NormalizeEmail(googleUser.Email);
+        var user = await _db.Users.FirstOrDefaultAsync(u => u.Email == email, cancellationToken);
+        var now = DateTime.UtcNow;
+
+        if (user == null)
+        {
+            user = new User
+            {
+                Email = email,
+                PasswordHash = "",
+                Role = "Landlord",
+                IsEmailConfirmed = true,
+                EmailConfirmedAt = now
+            };
+            _db.Users.Add(user);
+        }
+        else if (!user.IsEmailConfirmed)
+        {
+            user.IsEmailConfirmed = true;
+            user.EmailConfirmedAt = now;
+
+            var existingCodes = _db.EmailConfirmationCodes
+                .Where(code => code.UserId == user.Id && code.ConsumedAt == null);
+            _db.EmailConfirmationCodes.RemoveRange(existingCodes);
+        }
+
+        await _db.SaveChangesAsync(cancellationToken);
 
         return Ok(new { token = CreateToken(user) });
     }

@@ -2,6 +2,7 @@ using System.IdentityModel.Tokens.Jwt;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using nettest.Controllers;
+using nettest.Data;
 using nettest.Dtos;
 using nettest.Models;
 using nettest.Services;
@@ -22,7 +23,7 @@ public class AuthControllerTests
         });
         db.SaveChanges();
 
-        var controller = new AuthController(db, CreateConfiguration(), new NoopEmailConfirmationSender());
+        var controller = CreateController(db);
 
         var result = controller.Login(new LoginDto
         {
@@ -51,7 +52,7 @@ public class AuthControllerTests
         });
         db.SaveChanges();
 
-        var controller = new AuthController(db, CreateConfiguration(), new NoopEmailConfirmationSender());
+        var controller = CreateController(db);
 
         var result = controller.Login(new LoginDto
         {
@@ -75,7 +76,7 @@ public class AuthControllerTests
         });
         db.SaveChanges();
 
-        var controller = new AuthController(db, CreateConfiguration(), new NoopEmailConfirmationSender());
+        var controller = CreateController(db);
 
         var result = controller.Login(new LoginDto
         {
@@ -92,7 +93,7 @@ public class AuthControllerTests
     {
         using var db = TestHelpers.CreateDbContext();
         var emailSender = new CapturingEmailConfirmationSender();
-        var controller = new AuthController(db, CreateConfiguration(), emailSender);
+        var controller = CreateController(db, emailSender);
 
         var result = await controller.Register(
             new RegisterDto
@@ -116,7 +117,7 @@ public class AuthControllerTests
     {
         using var db = TestHelpers.CreateDbContext();
         var emailSender = new CapturingEmailConfirmationSender();
-        var controller = new AuthController(db, CreateConfiguration(), emailSender);
+        var controller = CreateController(db, emailSender);
 
         await controller.Register(
             new RegisterDto
@@ -144,6 +145,76 @@ public class AuthControllerTests
         Assert.Equal("landlord@example.com", jwt.Claims.Single(c => c.Type == "email").Value);
     }
 
+    [Fact]
+    public async Task GoogleLogin_creates_confirmed_user_and_returns_token()
+    {
+        using var db = TestHelpers.CreateDbContext();
+        var controller = CreateController(
+            db,
+            googleTokenVerifier: new FakeGoogleTokenVerifier(
+                new GoogleTokenUser("Landlord@Example.com", EmailVerified: true)));
+
+        var result = await controller.GoogleLogin(
+            new GoogleLoginDto { IdToken = "valid-token" },
+            CancellationToken.None);
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        var token = ok.Value!.GetType().GetProperty("token")!.GetValue(ok.Value) as string;
+        var jwt = new JwtSecurityTokenHandler().ReadJwtToken(token);
+        var user = Assert.Single(db.Users);
+
+        Assert.Equal("landlord@example.com", user.Email);
+        Assert.Equal("Landlord", user.Role);
+        Assert.True(user.IsEmailConfirmed);
+        Assert.NotNull(user.EmailConfirmedAt);
+        Assert.Equal("landlord@example.com", jwt.Claims.Single(c => c.Type == "email").Value);
+    }
+
+    [Fact]
+    public async Task GoogleLogin_confirms_existing_unconfirmed_user()
+    {
+        using var db = TestHelpers.CreateDbContext();
+        db.Users.Add(new User
+        {
+            Email = "landlord@example.com",
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword("password123"),
+            Role = "Landlord",
+            IsEmailConfirmed = false
+        });
+        db.SaveChanges();
+
+        var controller = CreateController(
+            db,
+            googleTokenVerifier: new FakeGoogleTokenVerifier(
+                new GoogleTokenUser("landlord@example.com", EmailVerified: true)));
+
+        var result = await controller.GoogleLogin(
+            new GoogleLoginDto { IdToken = "valid-token" },
+            CancellationToken.None);
+
+        Assert.IsType<OkObjectResult>(result);
+        var user = Assert.Single(db.Users);
+        Assert.True(user.IsEmailConfirmed);
+        Assert.NotNull(user.EmailConfirmedAt);
+    }
+
+    [Fact]
+    public async Task GoogleLogin_returns_unauthorized_for_unverified_google_email()
+    {
+        using var db = TestHelpers.CreateDbContext();
+        var controller = CreateController(
+            db,
+            googleTokenVerifier: new FakeGoogleTokenVerifier(
+                new GoogleTokenUser("landlord@example.com", EmailVerified: false)));
+
+        var result = await controller.GoogleLogin(
+            new GoogleLoginDto { IdToken = "valid-token" },
+            CancellationToken.None);
+
+        Assert.IsType<UnauthorizedResult>(result);
+        Assert.Empty(db.Users);
+    }
+
     private static IConfiguration CreateConfiguration()
     {
         return new ConfigurationBuilder()
@@ -154,6 +225,18 @@ public class AuthControllerTests
                 ["Jwt:Audience"] = "nettest-client"
             })
             .Build();
+    }
+
+    private static AuthController CreateController(
+        AppDbContext db,
+        IEmailConfirmationSender? emailSender = null,
+        IGoogleTokenVerifier? googleTokenVerifier = null)
+    {
+        return new AuthController(
+            db,
+            CreateConfiguration(),
+            emailSender ?? new NoopEmailConfirmationSender(),
+            googleTokenVerifier ?? new FakeGoogleTokenVerifier(null));
     }
 
     private sealed class NoopEmailConfirmationSender : IEmailConfirmationSender
@@ -178,6 +261,18 @@ public class AuthControllerTests
         {
             Code = code;
             return Task.CompletedTask;
+        }
+    }
+
+    private sealed class FakeGoogleTokenVerifier(GoogleTokenUser? user) : IGoogleTokenVerifier
+    {
+        private readonly GoogleTokenUser? _user = user;
+
+        public Task<GoogleTokenUser?> VerifyAsync(
+            string idToken,
+            CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult(_user);
         }
     }
 }
